@@ -3,7 +3,6 @@ import {
   JSX,
   onMount,
   Show,
-  Suspense,
   useContext,
 } from 'solid-js';
 import useMeta from '../meta/use-meta';
@@ -13,24 +12,25 @@ import {
   LoadResult,
   matchRoute,
   Page,
+  PageProps,
   Router,
   useFallback,
   useRouter,
 } from '../router';
 import { CacheBoundary, useCache } from './cache';
 
-const Data = createContext<{ data: LoadResult<any>, initial: boolean }>();
+const Data = createContext<{ initial: boolean }>();
 
-function createPage<T>(
-  Comp: Page<T>,
-): () => JSX.Element {
-  function CustomPage() {
+function createPage<P>(
+  Comp: Page<P>,
+): Page<P> {
+  return function CustomPage(props: PageProps<P>) {
     const ctx = useContext(Data)!;
     const router = useRouter();
     const yieldFallback = useFallback();
     const data = useCache(
       ctx.initial
-        ? { initialData: ctx.data as LoadResult<T> }
+        ? { initialData: props.data as LoadResult<P> }
         : { shouldRevalidate: true },
     );
 
@@ -52,13 +52,15 @@ function createPage<T>(
           if (!ctx.initial) {
             useMeta(loaded);
           }
-          return <Comp {...loaded.props} />;
+          return (
+            <Comp isLayout={props.isLayout} data={loaded.props}>
+              {props.children}
+            </Comp>
+          );
         }}
       </Show>
     );
-  }
-  CustomPage.getLayout = Comp.getLayout;
-  return CustomPage;
+  };
 }
 
 function normalizeRoute(path: string, offset: number): string {
@@ -103,7 +105,7 @@ export function defineLoaderRouter(config: LoaderConfig) {
 }
 
 export interface RouterProps<T> {
-  data: LoadResult<T>;
+  data: LoadResult<T>[];
   pathname: string;
   search: string;
 }
@@ -121,9 +123,10 @@ export function definePageRouter(config: RendererConfig) {
   return function Renderer<T>(props: RouterProps<T>) {
     return (
       <CacheBoundary>
-        <Data.Provider value={{ initial: true, data: props.data }}>
+        <Data.Provider value={{ initial: true }}>
           <Router
             routes={pages}
+            data={props.data}
             location={{
               pathname: props.pathname,
               search: props.search,

@@ -138,9 +138,14 @@ export function matchRoute<T>(root: RouterNode<T>, path: string): RouterResult<T
   return results;
 }
 
+export interface PageProps<P> {
+  isLayout: boolean;
+  data: P;
+  children?: JSX.Element;
+}
+
 export interface Page<P> {
-  (props: P): JSX.Element;
-  getLayout?: (props: { children: JSX.Element }) => JSX.Element;
+  (props: PageProps<P>): JSX.Element;
 }
 
 export type PageRoute = Route<Page<any>>;

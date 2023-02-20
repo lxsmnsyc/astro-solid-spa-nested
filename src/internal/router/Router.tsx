@@ -10,9 +10,10 @@ import {
 import { Dynamic } from 'solid-js/web';
 import assert from '../assert';
 import {
-  createPage,
+  LoadResult,
   matchRoute,
   Page,
+  PageProps,
   PageRouter,
   RouterParams,
   RouterResult,
@@ -33,26 +34,27 @@ export function useFallback() {
   return ctx;
 }
 
-const DEFAULT_PAGE: Page<any> = createPage(() => null);
-
-DEFAULT_PAGE.getLayout = (props) => createMemo(() => props.children);
-
 interface RouteBuilderProps {
   result: RouterResult<Page<any>>[];
+  data: LoadResult<any>[];
 }
+
+const DEFAULT_PAGE = (props: PageProps<any>) => props.children;
 
 function RouteBuilder(props: RouteBuilderProps): JSX.Element {
   const length = createMemo(() => props.result.length);
   const page = createMemo(() => props.result[0].value ?? DEFAULT_PAGE);
-  const layout = createMemo(() => page().getLayout ?? DEFAULT_PAGE.getLayout);
   const params = createMemo(() => props.result[0].params);
-  const rest = createMemo(() => props.result.slice(1));
+  const routerRest = createMemo(() => props.result.slice(1));
+  const dataRest = createMemo(() => props.data.slice(1));
+  const data = createMemo(() => props.data[0]);
+  const isLayout = createMemo(() => length() > 1);
 
   return (
     <ParamsContext.Provider value={params}>
-      <Dynamic component={layout()}>
-        <Show when={length() > 1} fallback={<Dynamic component={page()} />}>
-          <RouteBuilder result={rest()} />
+      <Dynamic component={page()} data={data()} isLayout={isLayout()}>
+        <Show when={isLayout()}>
+          <RouteBuilder result={routerRest()} data={dataRest()} />
         </Show>
       </Dynamic>
     </ParamsContext.Provider>
@@ -61,6 +63,7 @@ function RouteBuilder(props: RouteBuilderProps): JSX.Element {
 
 interface RouteBuilderRootProps {
   result: RouterResult<Page<any>>[];
+  data: LoadResult<any>[];
   fallback?: JSX.Element;
 }
 
@@ -69,13 +72,14 @@ function RouteBuilderRoot(props: RouteBuilderRootProps): JSX.Element {
 
   return (
     <Show when={hasResult()} fallback={props.fallback}>
-      <RouteBuilder result={props.result} />
+      <RouteBuilder result={props.result} data={props.data} />
     </Show>
   );
 }
 
 export interface RouterProps {
   routes: PageRouter;
+  data: LoadResult<any>[];
   fallback?: JSX.Element;
   location?: UseLocationOptions;
 }
@@ -106,7 +110,7 @@ export default function Router(
     <LocationContext.Provider value={location}>
       <FallbackContext.Provider value={yieldFallback}>
         <Show when={!fallback()} fallback={props.fallback}>
-          <RouteBuilderRoot result={matchedRoute()} />
+          <RouteBuilderRoot data={props.data} result={matchedRoute()} />
         </Show>
       </FallbackContext.Provider>
     </LocationContext.Provider>

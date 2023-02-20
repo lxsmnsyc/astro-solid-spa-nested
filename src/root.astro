@@ -4,15 +4,17 @@ import { LoadResult } from './internal/router';
 import PageRouter from './page-router';
 
 interface Props {
-  data: LoadResult<any>;
+  data: LoadResult<any>[];
 }
+
+const lastData = Astro.props.data[Astro.props.data.length - 1];
 
 ---
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    {'meta' in Astro.props.data && <Fragment set:html={renderMeta(Astro.props.data)} />}
+    {lastData && 'meta' in lastData && <Fragment set:html={renderMeta(lastData)} />}
   </head>
   <body>
     <div class="flex items-center justify-center bg-gradient-to-l from-sky-400 to-indigo-600 min-h-screen">

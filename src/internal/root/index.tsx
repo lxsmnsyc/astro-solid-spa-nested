@@ -29,11 +29,11 @@ function createPage<P>(
     const router = useRouter();
     const yieldFallback = useFallback();
     const data = useCache(
+      () => props.path,
       ctx.initial
         ? { initialData: props.data as LoadResult<P> }
         : { shouldRevalidate: true },
     );
-
     onMount(() => {
       ctx.initial = false;
     });
@@ -53,7 +53,7 @@ function createPage<P>(
             useMeta(loaded);
           }
           return (
-            <Comp isLayout={props.isLayout} data={loaded.props}>
+            <Comp path={props.path} isLayout={props.isLayout} data={loaded.props}>
               {props.children}
             </Comp>
           );

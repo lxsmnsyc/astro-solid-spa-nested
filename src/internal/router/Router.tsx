@@ -34,27 +34,38 @@ export function useFallback() {
   return ctx;
 }
 
-interface RouteBuilderProps {
+interface RouterData {
   result: RouterResult<Page<any>>[];
   data: LoadResult<any>[];
+}
+
+const RouterDataContext = createContext<RouterData>();
+
+function useRouterData() {
+  const ctx = useContext(RouterDataContext);
+  assert(ctx != null, new Error('Missing RouterDataContext'));
+  return ctx;
+}
+
+interface RouteBuilderProps {
+  depth: number;
 }
 
 const DEFAULT_PAGE = (props: PageProps<any>) => props.children;
 
 function RouteBuilder(props: RouteBuilderProps): JSX.Element {
-  const length = createMemo(() => props.result.length);
-  const page = createMemo(() => props.result[0].value ?? DEFAULT_PAGE);
-  const params = createMemo(() => props.result[0].params);
-  const routerRest = createMemo(() => props.result.slice(1));
-  const dataRest = createMemo(() => props.data.slice(1));
-  const data = createMemo(() => props.data[0]);
-  const isLayout = createMemo(() => length() > 1);
+  const ctx = useRouterData();
+  const page = createMemo(() => ctx.result[props.depth].value ?? DEFAULT_PAGE);
+  const params = createMemo(() => ctx.result[props.depth].params);
+  const data = createMemo(() => ctx.data[props.depth]);
+  const isLayout = createMemo(() => props.depth < ctx.result.length - 1);
+  const path = createMemo(() => ctx.result[props.depth].path);
 
   return (
     <ParamsContext.Provider value={params}>
-      <Dynamic component={page()} data={data()} isLayout={isLayout()}>
+      <Dynamic component={page()} path={path()} data={data()} isLayout={isLayout()}>
         <Show when={isLayout()}>
-          <RouteBuilder result={routerRest()} data={dataRest()} />
+          <RouteBuilder depth={props.depth + 1} />
         </Show>
       </Dynamic>
     </ParamsContext.Provider>
@@ -62,17 +73,16 @@ function RouteBuilder(props: RouteBuilderProps): JSX.Element {
 }
 
 interface RouteBuilderRootProps {
-  result: RouterResult<Page<any>>[];
-  data: LoadResult<any>[];
   fallback?: JSX.Element;
 }
 
 function RouteBuilderRoot(props: RouteBuilderRootProps): JSX.Element {
-  const hasResult = createMemo(() => props.result.length > 0);
+  const ctx = useRouterData();
+  const hasResult = createMemo(() => ctx.result.length > 0);
 
   return (
     <Show when={hasResult()} fallback={props.fallback}>
-      <RouteBuilder result={props.result} data={props.data} />
+      <RouteBuilder depth={0} />
     </Show>
   );
 }
@@ -110,7 +120,16 @@ export default function Router(
     <LocationContext.Provider value={location}>
       <FallbackContext.Provider value={yieldFallback}>
         <Show when={!fallback()} fallback={props.fallback}>
-          <RouteBuilderRoot data={props.data} result={matchedRoute()} />
+          <RouterDataContext.Provider
+            value={{
+              get result() {
+                return matchedRoute();
+              },
+              data: props.data,
+            }}
+          >
+            <RouteBuilderRoot />
+          </RouterDataContext.Provider>
         </Show>
       </FallbackContext.Provider>
     </LocationContext.Provider>

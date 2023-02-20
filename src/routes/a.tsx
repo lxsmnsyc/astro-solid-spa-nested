@@ -1,9 +1,9 @@
 import { JSX, Show, Suspense } from 'solid-js';
 import { Link, LoadResult, PageProps } from '../internal/router';
 
-export function load(): LoadResult<undefined> {
+export function load(): LoadResult<string> {
   return {
-    props: undefined,
+    props: 'Page A',
     meta: {
       title: 'Page A',
       description: 'An example page for static routing',
@@ -11,12 +11,12 @@ export function load(): LoadResult<undefined> {
   };
 }
 
-export default function A(props: PageProps<undefined>): JSX.Element {
+export default function A(props: PageProps<string>): JSX.Element {
   return (
     <div class="p-4 rounded-lg bg-indigo-900 bg-opacity-25 flex flex-col space-y-4">
       <span class="text-2xl text-white font-sans">
         {'Welcome to '}
-        <span class="bg-white bg-opacity-25 font-mono p-2 rounded m-1">Page A</span>
+        <span class="bg-white bg-opacity-25 font-mono p-2 rounded m-1">{props.data}</span>
         !
       </span>
       <div class="flex flex-col space-y-1">

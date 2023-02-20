@@ -70,7 +70,7 @@ function addRoute<T>(
   }
 }
 
-function normalizePath(route: string): string {
+export function normalizePath(route: string): string {
   return route.endsWith('/')
     ? route.substring(0, route.length - 1)
     : route;
@@ -94,6 +94,7 @@ export function createRouterTree<T>(routes: Route<T>[]): RouterNode<T> {
 
 export interface RouterResult<T> {
   value?: T;
+  path: string;
   params: RouterParams;
 }
 
@@ -107,26 +108,27 @@ export function matchRoute<T>(root: RouterNode<T>, path: string): RouterResult<T
     const current = paths[i];
     if (current in node.normal) {
       node = node.normal[current];
+      const result = i === 0 ? '/' : paths.slice(0, i + 1).join('/');
       results.push({
         value: node.value,
+        path: result,
         params: { ...params },
       });
     } else if (node.named) {
       node = node.named;
       params[node.key] = current;
+      const result = i === 0 ? '/' : paths.slice(0, i + 1).join('/');
       results.push({
         value: node.value,
+        path: result,
         params: { ...params },
       });
     } else if (node.glob) {
       node = node.glob;
-      const list = [];
-      for (let k = i; k < len; k += 1) {
-        list.push(paths[k]);
-      }
-      params[node.key] = list;
+      params[node.key] = paths.slice(i);
       results.push({
         value: node.value,
+        path: paths.join('/'),
         params: { ...params },
       });
       break;
@@ -139,6 +141,7 @@ export function matchRoute<T>(root: RouterNode<T>, path: string): RouterResult<T
 }
 
 export interface PageProps<P> {
+  path: string;
   isLayout: boolean;
   data: P;
   children?: JSX.Element;

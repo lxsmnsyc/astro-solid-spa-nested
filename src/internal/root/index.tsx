@@ -39,24 +39,22 @@ function createPage<T>(
     });
 
     return (
-      <Suspense>
-        <Show when={data()} keyed>
-          {(loaded) => {
-            if ('redirect' in loaded) {
-              router.push(loaded.redirect);
-              return null;
-            }
-            if ('notFound' in loaded) {
-              yieldFallback();
-              return null;
-            }
-            if (!ctx.initial) {
-              useMeta(loaded);
-            }
-            return <Comp {...loaded.props} />;
-          }}
-        </Show>
-      </Suspense>
+      <Show when={data()} keyed>
+        {(loaded) => {
+          if ('redirect' in loaded) {
+            router.push(loaded.redirect);
+            return null;
+          }
+          if ('notFound' in loaded) {
+            yieldFallback();
+            return null;
+          }
+          if (!ctx.initial) {
+            useMeta(loaded);
+          }
+          return <Comp {...loaded.props} />;
+        }}
+      </Show>
     );
   }
   CustomPage.getLayout = Comp.getLayout;

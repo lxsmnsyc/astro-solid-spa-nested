@@ -1,4 +1,4 @@
-import { JSX } from 'solid-js';
+import { JSX, Suspense } from 'solid-js';
 import { Link, LoadResult } from '../internal/router';
 
 export function load(): LoadResult<undefined> {
@@ -31,7 +31,9 @@ Index.getLayout = (props: { children: JSX.Element }) => (
       !
     </span>
     <div class="flex flex-col space-y-1">
-      {props.children}
+      <Suspense>
+        {props.children}
+      </Suspense>
     </div>
   </div>
 );

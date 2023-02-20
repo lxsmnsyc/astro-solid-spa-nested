@@ -1,0 +1,23 @@
+---
+import { LoadResult } from '../internal/router';
+import getLoader from '../load-router';
+import Root from '../root.astro';
+
+const loader = getLoader(Astro.url);
+let data: LoadResult<any> = { props: undefined };
+if (loader && loader.value) {
+    data = await loader.value(Astro.request, loader.params);
+}
+if (Astro.url.searchParams.has('.get')) {
+  return new Response(JSON.stringify(data), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json"
+    }
+  })
+}
+if ('redirect' in data) {
+  return Astro.redirect(data.redirect);
+}
+---
+<Root data={data} />

@@ -3,13 +3,19 @@ import {
   createContext,
   useContext,
   createMemo,
-  Show,
   mergeProps,
+  Show,
+  createSignal,
 } from 'solid-js';
+import { Dynamic } from 'solid-js/web';
+import assert from '../assert';
 import {
+  createPage,
   matchRoute,
+  Page,
   PageRouter,
   RouterParams,
+  RouterResult,
 } from './router-node';
 import useLocation, { UseLocation, UseLocationOptions } from './use-location';
 
@@ -18,7 +24,55 @@ export interface RouterInstance<P extends RouterParams = RouterParams> extends U
 }
 
 const LocationContext = createContext<UseLocation>();
-const ParamsContext = createContext<RouterParams>();
+const ParamsContext = createContext<() => RouterParams>();
+const FallbackContext = createContext<() => void>();
+
+export function useFallback() {
+  const ctx = useContext(FallbackContext);
+  assert(ctx != null, new Error('Missing FallbackContext'));
+  return ctx;
+}
+
+const DEFAULT_PAGE: Page<any> = createPage(() => null);
+
+DEFAULT_PAGE.getLayout = (props) => createMemo(() => props.children);
+
+interface RouteBuilderProps {
+  result: RouterResult<Page<any>>[];
+}
+
+function RouteBuilder(props: RouteBuilderProps): JSX.Element {
+  const length = createMemo(() => props.result.length);
+  const page = createMemo(() => props.result[0].value ?? DEFAULT_PAGE);
+  const layout = createMemo(() => page().getLayout ?? DEFAULT_PAGE.getLayout);
+  const params = createMemo(() => props.result[0].params);
+  const rest = createMemo(() => props.result.slice(1));
+
+  return (
+    <ParamsContext.Provider value={params}>
+      <Dynamic component={layout()}>
+        <Show when={length() > 1} fallback={<Dynamic component={page()} />}>
+          <RouteBuilder result={rest()} />
+        </Show>
+      </Dynamic>
+    </ParamsContext.Provider>
+  );
+}
+
+interface RouteBuilderRootProps {
+  result: RouterResult<Page<any>>[];
+  fallback?: JSX.Element;
+}
+
+function RouteBuilderRoot(props: RouteBuilderRootProps): JSX.Element {
+  const hasResult = createMemo(() => props.result.length > 0);
+
+  return (
+    <Show when={hasResult()} fallback={props.fallback}>
+      <RouteBuilder result={props.result} />
+    </Show>
+  );
+}
 
 export interface RouterProps {
   routes: PageRouter;
@@ -31,29 +85,30 @@ export default function Router(
 ): JSX.Element {
   const location = useLocation(() => props.routes, props.location);
 
-  const pathname = createMemo(() => {
+  const matchedRoute = createMemo(() => {
     const route = location.pathname;
-
-    return route !== '/' && route.endsWith('/')
-      ? route.substring(0, route.length - 1)
-      : route;
+    const result = matchRoute(props.routes, route);
+    return result;
   });
 
-  const matchedRoute = () => (
-    matchRoute(props.routes, pathname())
-  );
+  const [fallback, setFallback] = createSignal(false);
+
+  function yieldFallback() {
+    setFallback(true);
+  }
+
+  createMemo(() => {
+    matchedRoute();
+    setFallback(false);
+  });
 
   return (
     <LocationContext.Provider value={location}>
-      <Show when={matchedRoute()} fallback={props.fallback} keyed>
-        {(result) => (
-          <ParamsContext.Provider value={result.params}>
-            <Show when={result.value} keyed>
-              {(Comp) => <Comp />}
-            </Show>
-          </ParamsContext.Provider>
-        )}
-      </Show>
+      <FallbackContext.Provider value={yieldFallback}>
+        <Show when={!fallback()} fallback={props.fallback}>
+          <RouteBuilderRoot result={matchedRoute()} />
+        </Show>
+      </FallbackContext.Provider>
     </LocationContext.Provider>
   );
 }
@@ -63,7 +118,7 @@ export function useRouter<P extends RouterParams>(): RouterInstance<P> {
   const params = useContext(ParamsContext);
   if (location) {
     return mergeProps(location, {
-      params: params as P,
+      params: (params ? params() : {}) as P,
     });
   }
   throw new Error('useRouter must be used in a component within <Router>');

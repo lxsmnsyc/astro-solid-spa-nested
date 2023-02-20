@@ -5,8 +5,11 @@ import Root from '../root.astro';
 
 const loader = getLoader(Astro.url);
 let data: LoadResult<any> = { props: undefined };
-if (loader && loader.value) {
-    data = await loader.value(Astro.request, loader.params);
+if (loader.length) {
+  const last = loader[loader.length - 1];
+  if (last.value) {
+    data = await last.value(Astro.request, last.params);
+  } 
 }
 if (Astro.url.searchParams.has('.get')) {
   return new Response(JSON.stringify(data), {

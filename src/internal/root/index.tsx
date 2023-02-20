@@ -1,5 +1,4 @@
 import {
-  createComponent,
   createContext,
   JSX,
   onMount,
@@ -13,7 +12,9 @@ import {
   Load,
   LoadResult,
   matchRoute,
+  Page,
   Router,
+  useFallback,
   useRouter,
 } from '../router';
 import { CacheBoundary, useCache } from './cache';
@@ -21,12 +22,12 @@ import { CacheBoundary, useCache } from './cache';
 const Data = createContext<{ data: LoadResult<any>, initial: boolean }>();
 
 function createPage<T>(
-  Comp: (props: T) => JSX.Element,
-  fallback: () => JSX.Element,
+  Comp: Page<T>,
 ): () => JSX.Element {
-  return function CustomPage() {
+  function CustomPage() {
     const ctx = useContext(Data)!;
     const router = useRouter();
+    const yieldFallback = useFallback();
     const data = useCache(
       ctx.initial
         ? { initialData: ctx.data as LoadResult<T> }
@@ -46,7 +47,8 @@ function createPage<T>(
               return null;
             }
             if ('notFound' in loaded) {
-              return createComponent(fallback, {});
+              yieldFallback();
+              return null;
             }
             if (!ctx.initial) {
               useMeta(loaded);
@@ -56,7 +58,9 @@ function createPage<T>(
         </Show>
       </Suspense>
     );
-  };
+  }
+  CustomPage.getLayout = Comp.getLayout;
+  return CustomPage;
 }
 
 function normalizeRoute(path: string, offset: number): string {
@@ -94,6 +98,7 @@ export function defineLoaderRouter(config: LoaderConfig) {
       path: normalizeRoute(key, offset),
       value,
     }));
+
   const loaders = createRouterTree(rawLoaders);
 
   return (url: URL) => matchRoute(loaders, url.pathname);
@@ -110,7 +115,7 @@ export function definePageRouter(config: RendererConfig) {
   const rawPages = Object.entries(config.routes.imports)
     .map(([key, value]) => ({
       path: normalizeRoute(key, offset),
-      value: createPage(value, config.pages[404]),
+      value: createPage(value),
     }));
 
   const pages = createRouterTree(rawPages);

@@ -1,4 +1,5 @@
-import { Component, JSX } from 'solid-js';
+import { JSX } from 'solid-js';
+import assert from '../assert';
 import { Meta } from '../meta/interface';
 
 export interface RouterParams {
@@ -8,185 +9,71 @@ export interface RouterParams {
 export interface RouterNode<T> {
   key: string;
   value?: T;
-  normal: RouterNode<T>[];
+  normal: Record<string, RouterNode<T>>;
   glob?: RouterNode<T>;
   named?: RouterNode<T>;
 }
 
-export function createRouterNode<T>(key: string, value?: T): RouterNode<T> {
+function createRouterNode<T>(key: string, value?: T): RouterNode<T> {
   return {
     key,
     value,
-    normal: [],
+    normal: {},
   };
 }
 
-function addToChildren<T>(
-  children: RouterNode<T>[],
-  key: string,
-  value?: T,
-): RouterNode<T> {
-  const node = createRouterNode(key, value);
-  children.push(node);
-  return node;
-}
-
-export function addRoute<T>(
+function addRoute<T>(
   parent: RouterNode<T>,
-  [lead, ...names]: string[],
+  path: string[],
   value: T,
-): void {
-  function addRouteToChildren(children: RouterNode<T>[]) {
-    for (let i = 0, len = children.length; i < len; i += 1) {
-      const child = children[i];
-
-      if (child.key === lead) {
-        if (names.length > 0) {
-          addRoute(child, names, value);
-          return;
-        }
-        throw new Error(`
-Duplicate router path detected.
-
-Received: '${child.key}'
-`);
-      }
+) {
+  let node = parent;
+  let paths = '';
+  for (let i = 0, len = path.length; i < len; i += 1) {
+    const current = path[i];
+    if (i !== 0) {
+      paths += `/${current}`;
     }
-
-    const node = addToChildren(children, lead);
-
-    if (names.length > 0) {
-      addRoute(node, names, value);
+    if (/^\[\.\.\.[a-zA-Z0-9]+\]$/.test(current)) {
+      const key = current.substring(4, current.length - 1);
+      let matched = node.glob;
+      assert(!(matched && matched.key !== key && matched.value), new Error(`Conflicting glob path at ${paths}`));
+      if (!matched) {
+        matched = createRouterNode(key, i === len - 1 ? value : undefined);
+        node.glob = matched;
+      } else if (i === len - 1) {
+        matched.value = value;
+      }
+      node = matched;
+    } else if (/^\[[a-zA-Z0-9]+\]$/.test(current)) {
+      const key = current.substring(1, current.length - 1);
+      let matched = node.named;
+      assert(!(matched && matched.key !== key && matched.value), new Error(`Conflicting named path at ${paths}`));
+      if (!matched) {
+        matched = createRouterNode(key, i === len - 1 ? value : undefined);
+        node.named = matched;
+      } else if (i === len - 1) {
+        matched.value = value;
+      }
+      node = matched;
     } else {
-      node.key = lead;
-      node.value = value;
+      let matched = node.normal[current];
+      assert(!(matched && i === len - 1 && matched.value), new Error(`Conflicting path at ${paths}`));
+      if (!matched) {
+        matched = createRouterNode(current, i === len - 1 ? value : undefined);
+        node.normal[current] = matched;
+      } else if (i === len - 1) {
+        matched.value = value;
+      }
+      node = matched;
     }
   }
-
-  if (lead.startsWith('[')) {
-    if (lead.endsWith(']')) {
-      if (lead.startsWith('[...')) {
-        if (parent.glob) {
-          throw new Error(`
-Shared router path detected.
-
-Received: '${lead}'
-Existing: '${parent.glob.key}'
-          `);
-        }
-        parent.glob = createRouterNode(lead, value);
-        return;
-      }
-      if (parent.named) {
-        if (lead !== parent.named.key) {
-          throw new Error(`
-Shared router path detected.
-
-Received: '${lead}'
-Existing: '${parent.named.key}'
-          `);
-        }
-      } else {
-        parent.named = createRouterNode(lead);
-      }
-      if (names.length > 0) {
-        addRoute(parent.named, names, value);
-      } else {
-        parent.named.value = value;
-      }
-      return;
-    }
-    throw new Error(`
-Invalid router path detected
-
-Received: '${lead}'
-`);
-  }
-  addRouteToChildren(parent.normal);
 }
 
-export interface RouterResult<T, P extends RouterParams = RouterParams> {
-  value?: T;
-  params: P;
-}
-
-function matchRouteInternal<T, P extends RouterParams = RouterParams>(
-  parent: RouterNode<T>,
-  [lead, ...names]: string[],
-  params: P = {} as P,
-): RouterResult<T, P> | undefined {
-  // Find first if the lead exists in the normal children
-  for (let i = 0, len = parent.normal.length; i < len; i += 1) {
-    const child = parent.normal[i];
-
-    if (child.key === lead) {
-      if (names.length > 0) {
-        const matched = matchRouteInternal(child, names, {
-          ...params,
-        });
-
-        if (matched) {
-          return matched;
-        }
-      } else {
-        return {
-          value: child.value,
-          params: {
-            ...params,
-          },
-        };
-      }
-    }
-  }
-
-  // Check if the parent has a named parameter
-  if (parent.named) {
-    if (names.length > 0) {
-      const namedKey = parent.named.key;
-      const paramKey = namedKey.substring(1, namedKey.length - 1);
-      const matched = matchRouteInternal(parent.named, names, {
-        ...params,
-        [paramKey]: lead,
-      });
-
-      if (matched) {
-        return matched;
-      }
-    } else {
-      const namedKey = parent.named.key;
-      const paramKey = namedKey.substring(1, namedKey.length - 1);
-      return {
-        value: parent.named.value,
-        params: {
-          ...params,
-          [paramKey]: lead,
-        },
-      };
-    }
-  }
-
-  if (parent.glob) {
-    const globKey = parent.glob.key;
-    const paramKey = globKey.substring(4, globKey.length - 1);
-    return {
-      value: parent.glob.value,
-      params: {
-        ...params,
-        [paramKey]: [lead, ...names],
-      },
-    };
-  }
-  return undefined;
-}
-
-export function matchRoute<T, P extends RouterParams = RouterParams>(
-  parent: RouterNode<T>,
-  route: string,
-): RouterResult<T, P> | undefined {
-  const normalizedRoute = route !== '/' && route.endsWith('/')
+function normalizePath(route: string): string {
+  return route.endsWith('/')
     ? route.substring(0, route.length - 1)
     : route;
-  return matchRouteInternal(parent, normalizedRoute.split('/'));
 }
 
 export interface Route<T> {
@@ -199,15 +86,61 @@ export function createRouterTree<T>(routes: Route<T>[]): RouterNode<T> {
 
   for (let i = 0, len = routes.length; i < len; i += 1) {
     const route = routes[i];
-    addRoute(root, route.path.split('/'), route.value);
+    addRoute(root, normalizePath(route.path).split('/'), route.value);
   }
 
   return root;
 }
 
-export interface Page<T> {
-  (props: T): JSX.Element;
-  preload?: () => Promise<void>;
+export interface RouterResult<T> {
+  value?: T;
+  params: RouterParams;
+}
+
+export function matchRoute<T>(root: RouterNode<T>, path: string): RouterResult<T>[] {
+  const params: RouterParams = {};
+  const results: RouterResult<T>[] = [];
+  const paths = normalizePath(path).split('/');
+  let node = root;
+
+  for (let i = 0, len = paths.length; i < len; i += 1) {
+    const current = paths[i];
+    if (current in node.normal) {
+      node = node.normal[current];
+      results.push({
+        value: node.value,
+        params: { ...params },
+      });
+    } else if (node.named) {
+      node = node.named;
+      params[node.key] = current;
+      results.push({
+        value: node.value,
+        params: { ...params },
+      });
+    } else if (node.glob) {
+      node = node.glob;
+      const list = [];
+      for (let k = i; k < len; k += 1) {
+        list.push(paths[k]);
+      }
+      params[node.key] = list;
+      results.push({
+        value: node.value,
+        params: { ...params },
+      });
+      break;
+    } else {
+      return [];
+    }
+  }
+
+  return results;
+}
+
+export interface Page<P> {
+  (props: P): JSX.Element;
+  getLayout?: (props: { children: JSX.Element }) => JSX.Element;
 }
 
 export type PageRoute = Route<Page<any>>;
@@ -239,6 +172,10 @@ export type LoadRoute = Route<Load>;
 export type LoadRouter = RouterNode<Load>;
 
 export interface SSRPage {
-  default: Component<any>;
+  default: Page<any>;
   load?: Load;
+}
+
+export function createPage<P>(page: Page<P>): Page<P> {
+  return page;
 }

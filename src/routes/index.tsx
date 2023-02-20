@@ -23,7 +23,7 @@ export default function Index(): JSX.Element {
   );
 }
 
-Index.getLayout = (props) => (
+Index.getLayout = (props: { children: JSX.Element }) => (
   <div class="p-4 rounded-lg bg-indigo-900 bg-opacity-25 flex flex-col space-y-4">
     <span class="text-2xl text-white font-sans">
       {'Welcome to '}

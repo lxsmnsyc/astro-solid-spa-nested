@@ -139,10 +139,8 @@ export default function Router(
 export function useRouter<P extends RouterParams>(): RouterInstance<P> {
   const location = useContext(LocationContext);
   const params = useContext(ParamsContext);
-  if (location) {
-    return mergeProps(location, {
-      params: (params ? params() : {}) as P,
-    });
-  }
-  throw new Error('useRouter must be used in a component within <Router>');
+  assert(location, new Error('useRouter must be used in a component within <Router>'));
+  return mergeProps(location, {
+    params: (params ? params() : {}) as P,
+  });
 }

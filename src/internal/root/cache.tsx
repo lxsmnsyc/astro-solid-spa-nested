@@ -11,6 +11,7 @@ import {
   LoadResult,
   useRouter,
 } from '../router';
+import assert from '../assert';
 
 function useSWRStore<T, P extends any[] = []>(
   store: SWRStore<T, P>,
@@ -21,9 +22,7 @@ function useSWRStore<T, P extends any[] = []>(
   const [resource] = createResource(
     suspenseless,
     async (result): Promise<T> => {
-      if (result.status === 'failure') {
-        throw result.data;
-      }
+      assert(result.status !== 'failure', result.data);
       const dat = await result.data;
       return dat;
     },

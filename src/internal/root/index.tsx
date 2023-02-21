@@ -34,6 +34,7 @@ function createPage<P>(
         ? { initialData: props.data as LoadResult<P> }
         : { shouldRevalidate: true },
     );
+
     onMount(() => {
       ctx.initial = false;
     });

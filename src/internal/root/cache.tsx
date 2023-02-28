@@ -69,7 +69,7 @@ export function useCache<T>(
   const router = useRouter();
   const result = useSWRStore(
     ctx,
-    () => [path(), new URLSearchParams(router.search).toString()],
+    () => [path(), router.search],
     options,
   );
   return result as Resource<LoadResult<T>>;

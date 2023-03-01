@@ -1,7 +1,13 @@
 ---
+import { handleRequest } from 'thaler/server';
 import { LoadResult } from '../internal/router';
 import getLoader from '../load-router';
 import Root from '../root.astro';
+
+const response = await handleRequest(Astro.request);
+if (response) {
+  return response;
+}
 
 const loader = getLoader(Astro.url);
 if (Astro.url.searchParams.has('.get')) {

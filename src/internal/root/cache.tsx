@@ -1,38 +1,39 @@
 import {
   createContext,
-  createResource,
+  // createResource,
   JSX,
   Resource,
   useContext,
 } from 'solid-js';
 import { SWRStore, createSWRStore } from 'swr-store';
-import { UseSWRStoreOptions, useSWRStoreSuspenseless } from 'solid-swr-store';
+// import { UseSWRStoreOptions, useSWRStoreSuspenseless } from 'solid-swr-store';
+import { useSWRStore, UseSWRStoreOptions } from 'solid-swr-store';
 import {
   LoadResult,
   useRouter,
 } from '../router';
-import assert from '../assert';
+// import assert from '../assert';
 
-function useSWRStore<T, P extends any[] = []>(
-  store: SWRStore<T, P>,
-  args: () => P,
-  options?: UseSWRStoreOptions<T>,
-): Resource<T | undefined> {
-  const suspenseless = useSWRStoreSuspenseless(store, args, options ?? {});
-  const [resource] = createResource(
-    suspenseless,
-    async (result): Promise<T> => {
-      assert(result.status !== 'failure', result.data);
-      const dat = await result.data;
-      return dat;
-    },
-    options ? {
-      initialValue: options.initialData,
-      ssrLoadFrom: 'initial',
-    } : {},
-  );
-  return resource as Resource<T | undefined>;
-}
+// function useSWRStore<T, P extends any[] = []>(
+//   store: SWRStore<T, P>,
+//   args: () => P,
+//   options?: UseSWRStoreOptions<T>,
+// ): Resource<T | undefined> {
+//   const suspenseless = useSWRStoreSuspenseless(store, args, options ?? {});
+//   const [resource] = createResource(
+//     suspenseless,
+//     async (result): Promise<T> => {
+//       assert(result.status !== 'failure', result.data);
+//       const dat = await result.data;
+//       return dat;
+//     },
+//     options ? {
+//       initialValue: options.initialData,
+//       ssrLoadFrom: 'initial',
+//     } : {},
+//   );
+//   return resource as Resource<T | undefined>;
+// }
 
 const CacheContext = createContext<SWRStore<any, string[]>>();
 
@@ -70,7 +71,7 @@ export function useCache<T>(
   const result = useSWRStore(
     ctx,
     () => [path(), router.search],
-    options,
+    options || {},
   );
   return result as Resource<LoadResult<T>>;
 }
